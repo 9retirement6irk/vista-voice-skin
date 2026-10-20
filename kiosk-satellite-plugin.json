@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "vista-voice-skin",
+  "name": "Vista Voice Skin",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "minAndroidSdk": 24,
+  "entryClass": "me.wxcyber.kiosk.vista.VistaSkinPlugin",
+  "description": "A Windows Vista style voice skin: an Aero glass window over an aurora wallpaper, a chrome microphone, task dialog text and the green glossy progress bar as the voice meter.",
+  "author": "wxcyber",
+  "license": "Apache-2.0",
+  "capabilities": [
+    "overlay",
+    "host.read",
+    "voice.skin",
+    "voice.text"
+  ],
+  "icon": "icon.png",
+  "voiceSkinThumbnail": "voice-skin.webp",
+  "settings": [
+    {
+      "key": "title",
+      "type": "string",
+      "title": "Window title",
+      "default": "Voice Assistant",
+      "group": "Look",
+      "description": "The text in the glass title bar and on the taskbar button."
+    },
+    {
+      "key": "showTaskbar",
+      "type": "boolean",
+      "title": "Show taskbar",
+      "default": true,
+      "group": "Look",
+      "description": "Draw the black glass taskbar with a clock along the bottom of the full screen look."
+    }
+  ],
+  "commands": []
+}
