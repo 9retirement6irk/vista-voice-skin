@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "vista-voice-skin",
   "name": "Vista Voice Skin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "apiVersion": 1,
   "minAndroidSdk": 24,
   "entryClass": "me.wxcyber.kiosk.vista.VistaSkinPlugin",
-  "description": "A Windows Vista style voice skin: an Aero glass window over an aurora wallpaper, a chrome microphone, task dialog text and the green glossy progress bar as the voice meter.",
+  "description": "A Windows Vista style voice skin: an Aero glass window over the Vista Aero Home Assistant theme's animated ribbon wallpaper, a chrome microphone, task dialog text, the green glossy progress bar as the voice meter and a Home Assistant start orb. Follows Kiosk Satellite's light and dark modes.",
   "author": "wxcyber",
   "license": "Apache-2.0",
   "capabilities": [

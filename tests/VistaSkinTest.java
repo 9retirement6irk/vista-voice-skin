@@ -132,6 +132,67 @@ public final class VistaSkinTest {
         staleState.onResult(true, map("skinSelected", true, "overlay", "full"), null);
         assert host.overlays.isEmpty();
 
+        // Theme: Light and Dark force theirs, anything else follows KS's light or dark mode.
+        Turn follow = new Turn();
+        for (String pick : new String[] {"auto", "Auto", "system", "", null, "something new"}) {
+            follow.theme = pick;
+            assert follow.dark(true) && !follow.dark(false) : pick;
+        }
+        follow.theme = " Dark ";
+        assert follow.dark(false);
+        follow.theme = "LIGHT";
+        assert !follow.dark(true);
+
+        // The wallpaper: the Vista Aero theme's ribbons SVG, ported whole.
+        assert RibbonData.RAYS.length == 6 && RibbonData.STROKES.length == 41 && RibbonData.FLARES.length == 2;
+        int pulses = 0;
+        for (Ribbon.Stroke s : RibbonData.STROKES) {
+            if (s.pulse) pulses++;
+            assert (s.d.length - 2) % 6 == 0 && s.d.length >= 8 : "M then whole cubic segments";
+            assert s.gradient == null || Arrays.asList("gSheet", "gLime", "gFeather").contains(s.gradient) : s.gradient;
+        }
+        assert pulses == 7;
+        assert RibbonData.STROKES[0].group == Ribbon.SWAY && RibbonData.STROKES[RibbonData.STROKES.length - 1].group == Ribbon.SWAY;
+        assert RibbonData.SHEET_COLORS[0] == 0xE67DFF5C && RibbonData.FLARES[1].delay == -4f;
+
+        // CSS timing: ease-in-out is symmetric and pinned at its ends.
+        assert Ribbon.easeInOut(0) == 0 && Ribbon.easeInOut(1) == 1 && Math.abs(Ribbon.easeInOut(.5f) - .5f) < 1e-4;
+        assert Math.abs(Ribbon.easeInOut(.25f) + Ribbon.easeInOut(.75f) - 1) < 1e-4 && Ribbon.easeInOut(.25f) < .25f;
+        // alternate runs forward then back; a negative delay starts partway through.
+        assert Ribbon.progress(0, 0, 10, Ribbon.ALTERNATE) == 0;
+        assert Math.abs(Ribbon.progress(13, 0, 10, Ribbon.ALTERNATE) - .7f) < 1e-5;
+        assert Math.abs(Ribbon.progress(0, -9, 41, Ribbon.ALTERNATE_REVERSE) - (1 - 9 / 41f)) < 1e-5;
+        assert Math.abs(Ribbon.progress(4, 0, 16, Ribbon.NORMAL) - .25f) < 1e-6;
+        // Rays and flares fade between 0.35 and 1.
+        assert Math.abs(Ribbon.fade(0, 0, 12) - .35f) < 1e-5 && Math.abs(Ribbon.fade(12, 0, 12) - 1) < 1e-5;
+        // Sway rests at its "from" pose at time 0 and swings to "to".
+        float[] pose = Ribbon.sway(Ribbon.SWAY_1, 0);
+        assert pose[0] == -0.6f && pose[1] == -6 && pose[2] == 4;
+        pose = Ribbon.sway(Ribbon.SWAY_1, 34);
+        assert Math.abs(pose[0] - .6f) < 1e-5 && Math.abs(pose[1] - 8) < 1e-4;
+        // A pulse is one dash of 100 in 1000, sliding forward; it wraps at the end.
+        assert Arrays.equals(Ribbon.pulseSpans(0, 0, 16), new float[] {0, 100});
+        assert Arrays.equals(Ribbon.pulseSpans(4, 0, 16), new float[] {250, 350});
+        float[] wrap = Ribbon.pulseSpans(15.2, 0, 16);
+        assert wrap.length == 4 && wrap[0] == 0 && Math.abs(wrap[1] - 50) < .01 && Math.abs(wrap[2] - 950) < .01 && wrap[3] == 1000;
+
+        // Geometry: cover fills the screen, centered, like "center / cover".
+        float[] fit = Ribbon.cover(1280, 800);
+        assert fit[0] == .64f && fit[1] == 0 && fit[2] == 0;
+        fit = Ribbon.cover(1080, 1920);
+        assert Math.abs(fit[0] - 1.536f) < 1e-5 && Math.abs(fit[1] - (1080 - 2000 * 1.536f) / 2) < 1e-2 && fit[2] == 0;
+        // CSS linear-gradient angles: 180deg runs top to bottom, 90deg left to right.
+        float[] down = Ribbon.cssLine(180, 100, 50);
+        assert Math.abs(down[0] - 50) < 1e-3 && Math.abs(down[1]) < 1e-3 && Math.abs(down[3] - 50) < 1e-3;
+        float[] right = Ribbon.cssLine(90, 100, 50);
+        assert Math.abs(right[0]) < 1e-3 && Math.abs(right[2] - 100) < 1e-3 && Math.abs(right[1] - 25) < 1e-3;
+        // "transparent" keeps the color and drops the alpha.
+        assert Ribbon.clear(0x8CBEFFAA) == 0x00BEFFAA;
+        assert Ribbon.LIGHT.glows.length == 2 && Ribbon.DARK.colors[0] == 0xFF02070D;
+
+        // The start orb shows KS's Home Assistant icon, and its plain house on a KS without it.
+        assert "mdi:home-assistant".equals(Aero.Taskbar.ORB_ICONS[0]) && "mdi:home".equals(Aero.Taskbar.ORB_ICONS[1]);
+
         // Older Kiosk Satellite: no voice skin events, nothing happens.
         Host older = new Host();
         older.older = true;

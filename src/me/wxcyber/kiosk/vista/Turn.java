@@ -52,10 +52,15 @@ final class Turn {
         return DONE;
     }
 
-    /** Theme picks the palette: Auto follows KS, Light and Dark force theirs. */
+    /**
+     * Theme picks the palette: Light and Dark force theirs, anything else
+     * (Auto, System, unset) follows Kiosk Satellite's own light or dark mode.
+     */
     boolean dark(boolean ksDark) {
-        String pick = theme;
-        return "dark".equals(pick) || (!"light".equals(pick) && ksDark);
+        String pick = theme == null ? "" : theme.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("dark".equals(pick)) return true;
+        if ("light".equals(pick)) return false;
+        return ksDark;
     }
 
     /** The main instruction line: the answer, else a placeholder for the phase. */
