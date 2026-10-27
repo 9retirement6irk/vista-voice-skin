@@ -19,22 +19,7 @@ public final class VistaSkinPlugin implements KioskPlugin {
     @Override public void start(PluginHost host, Map<String, Object> settings) {
         configure(settings);
         skin.turn.mic = loadMic(host);
-        skin.turn.wallpaperLight = loadBytes(host, "wallpaper-light.jpg", "Light wallpaper");
-        skin.turn.wallpaperDark = loadBytes(host, "wallpaper-dark.jpg", "Dark wallpaper");
         skin.start(host);
-    }
-
-    /** An asset's raw bytes, or null so the skin falls back to drawing its own. */
-    static byte[] loadBytes(PluginHost host, String name, String what) {
-        try (InputStream in = host.openAsset(name)) {
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            byte[] buffer = new byte[16384];
-            for (int read; (read = in.read(buffer)) != -1; ) out.write(buffer, 0, read);
-            return out.size() == 0 ? null : out.toByteArray();
-        } catch (Exception unavailable) {
-            host.log(what + " unavailable: " + unavailable.getMessage());
-            return null;
-        }
     }
 
     /** The chrome microphone. Without it the skin draws a plain one. */

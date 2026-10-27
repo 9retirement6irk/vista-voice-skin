@@ -38,13 +38,6 @@ final class Turn {
 
     /** The chrome microphone, or null when the asset could not load. */
     volatile Bitmap mic;
-    /**
-     * The Home Assistant theme's wallpapers, still compressed. The wallpaper
-     * view decodes the one it needs at its own size. Null draws the painted
-     * aurora instead.
-     */
-    volatile byte[] wallpaperLight;
-    volatile byte[] wallpaperDark;
 
     /** What the turn is doing, for the status line, the meter and the busy ring. */
     int phase() {
@@ -68,11 +61,6 @@ final class Turn {
         if ("dark".equals(pick)) return true;
         if ("light".equals(pick)) return false;
         return ksDark;
-    }
-
-    /** The compressed wallpaper for a mode, or null. */
-    byte[] wallpaper(boolean dark) {
-        return dark ? wallpaperDark : wallpaperLight;
     }
 
     /** The main instruction line: the answer, else a placeholder for the phase. */
