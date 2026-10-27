@@ -17,7 +17,7 @@ A [Kiosk Satellite](https://github.com/jxlarrea/kiosk-satellite) voice skin that
 
 **Docked.** A small glass window at the bottom of the screen with the microphone, the conversation and a thin progress bar. The dashboard stays in view and usable around it.
 
-**Wallpaper.** The same aurora as the Windows Vista Home Assistant theme: the green Aurora in light mode and the black Aurora in dark mode, scaled to cover the screen. They ship as `assets/wallpaper-light.jpg` and `assets/wallpaper-dark.jpg`; swap either file to use your own. Without them the skin paints its own aurora.
+**Wallpaper.** The same animated background as the Vista Aero Home Assistant theme: its light or dark CSS gradient with the ribbons SVG (`art/vista-ribbons.svg`) over it, scaled to cover the screen. The ribbons sway, light pulses travel along them and the rays and flare fade, on the same timings as the SVG. With Android's animations turned off it holds still. Android has no SVG renderer, so the skin draws the ribbons itself from `RibbonData.java`; after editing the SVG, run `python3 tools/gen_ribbons.py` to regenerate it.
 
 **Dark theme.** Smoky black glass with a black glossy client area, in the style of Windows Media Player 11.
 

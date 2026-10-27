@@ -546,23 +546,16 @@ final class Aero {
     // ---------------------------------------------------------------- Wallpaper
 
     /**
-     * The wallpaper. It shows the same aurora photo as the Windows Vista
-     * Home Assistant theme: the green Aurora in light mode and the black
-     * one in dark mode, scaled to cover the screen. Without those assets it
-     * paints its own aurora: soft green and cyan ribbons over deep teal.
-     * Either way it is prepared once whenever the size or theme changes,
-     * so it costs nothing per frame.
+     * The wallpaper: the Vista Aero Home Assistant theme's background, the
+     * same CSS gradients and animated ribbons, drawn by Ribbon. It follows
+     * light and dark mode with the rest of the skin and holds still when the
+     * device has animations turned off.
      */
     static final class Wallpaper extends View {
         private final Turn turn;
-        private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
-        private final Rect dst = new Rect();
-        private final Rect src = new Rect();
-        private Bitmap painted;
+        private Ribbon.Painter painter;
         private boolean dark;
-        private boolean paintedDark;
-        /** True when painted is the theme photo, which is cropped rather than stretched. */
-        private boolean photo;
+        private long started = -1;
 
         Wallpaper(Context context, Turn turn) {
             super(context);
@@ -571,141 +564,43 @@ final class Aero {
 
         void restyle(boolean dark) {
             this.dark = dark;
+            // The Background setting fades the whole wallpaper, as one layer.
+            Float background = turn.background;
+            setAlpha(background != null ? background : 1f);
             invalidate();
-        }
-
-        @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-            painted = null;
         }
 
         @Override protected void onDetachedFromWindow() {
             super.onDetachedFromWindow();
-            painted = null;
+            painter = null;
+            started = -1;
+        }
+
+        /** Android's "Remove animations" or an animator duration scale of 0, like prefers-reduced-motion. */
+        private boolean moving() {
+            try {
+                return android.provider.Settings.Global.getFloat(getContext().getContentResolver(), android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f;
+            } catch (RuntimeException unknown) {
+                return true;
+            }
         }
 
         @Override protected void onDraw(Canvas canvas) {
             int w = getWidth(), h = getHeight();
             if (w <= 0 || h <= 0) return;
-            if (painted == null || paintedDark != dark) {
-                painted = null;
+            if (painter == null) {
                 try {
-                    painted = decode(turn.wallpaper(dark), w, h);
-                    photo = painted != null;
-                    if (painted == null) painted = paint(Math.max(1, w / 2), Math.max(1, h / 2), dark);
-                    paintedDark = dark;
+                    painter = new Ribbon.Painter();
                 } catch (OutOfMemoryError tight) {
-                    painted = null;
-                    canvas.drawColor(dark ? 0xFF061624 : 0xFF0B3150);
+                    canvas.drawColor(dark ? 0xFF041A26 : 0xFF1689A8);
                     return;
                 }
             }
-            Float background = turn.background;
-            paint.setAlpha(Math.round(255 * (background != null ? background : 1f)));
-            dst.set(0, 0, w, h);
-            canvas.drawBitmap(painted, photo ? cover(painted.getWidth(), painted.getHeight(), w, h, src) : null, dst, paint);
-        }
-
-        /**
-         * Decodes the theme photo no smaller than the view needs, halving it
-         * while it stays at least that big, so a phone never holds a full
-         * size picture. Null when there is no photo or it will not decode.
-         */
-        static Bitmap decode(byte[] jpeg, int w, int h) {
-            if (jpeg == null || jpeg.length == 0) return null;
-            android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
-            bounds.inJustDecodeBounds = true;
-            android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, bounds);
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
-            android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
-            options.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, w, h);
-            return android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, options);
-        }
-
-        /** The largest power of two that keeps the picture at least as big as the view, to cover it. */
-        static int sampleSize(int imageW, int imageH, int viewW, int viewH) {
-            if (imageW <= 0 || imageH <= 0 || viewW <= 0 || viewH <= 0) return 1;
-            // Covering the view needs the picture at this fraction of its size.
-            float scale = Math.max(viewW / (float) imageW, viewH / (float) imageH);
-            int sample = 1;
-            while (sample < 64 && 1f / (sample * 2) >= scale) sample *= 2;
-            return sample;
-        }
-
-        /** The centered part of the picture that fills the view without stretching, like CSS cover. */
-        static Rect cover(int imageW, int imageH, int viewW, int viewH, Rect out) {
-            int[] crop = coverCrop(imageW, imageH, viewW, viewH);
-            out.set(crop[0], crop[1], crop[2], crop[3]);
-            return out;
-        }
-
-        /** left, top, right, bottom of the cover crop. */
-        static int[] coverCrop(int imageW, int imageH, int viewW, int viewH) {
-            float imageRatio = imageW / (float) imageH, viewRatio = viewW / (float) Math.max(1, viewH);
-            if (imageRatio > viewRatio) {
-                int cropW = Math.max(1, Math.min(imageW, Math.round(imageH * viewRatio)));
-                int left = (imageW - cropW) / 2;
-                return new int[] {left, 0, left + cropW, imageH};
-            }
-            int cropH = Math.max(1, Math.min(imageH, Math.round(imageW / viewRatio)));
-            int top = (imageH - cropH) / 2;
-            return new int[] {0, top, imageW, top + cropH};
-        }
-
-        static Bitmap paint(int w, int h, boolean dark) {
-            Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(bitmap);
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
-            // The deep teal ground, an ellipse of light off center.
-            float cx = (dark ? .65f : .35f) * w, cy = (dark ? .45f : .55f) * h;
-            float rx = .9f * w, ry = .8f * h;
-            RadialGradient ground = dark
-                ? new RadialGradient(cx, cy, rx, new int[] {0xFF0F3B4A, 0xFF08202F, 0xFF030B14}, new float[] {0, .4f, 1}, CLAMP)
-                : new RadialGradient(cx, cy, rx, new int[] {0xFF1F8B78, 0xFF12566A, 0xFF0B3150, 0xFF061A2E}, new float[] {0, .32f, .62f, 1}, CLAMP);
-            Matrix stretch = new Matrix();
-            stretch.setScale(1, ry / rx, cx, cy);
-            ground.setLocalMatrix(stretch);
-            paint.setShader(ground);
-            canvas.drawRect(0, 0, w, h, paint);
-            paint.setShader(null);
-
-            // Ribbons, laid out on a 1280 by 800 sketch and stretched to fit.
-            float sx = w / 1280f, sy = h / 800f, sk = Math.min(sx, sy);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeCap(Paint.Cap.ROUND);
-            if (dark) {
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 120, 240, 200, 460, 470, 760, 480, 1160, 560, 1380, 760}, 110, 16, 1, new int[] {0x003EF2A0, 0x8C3EF2A0, 0x002FB7FF});
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 140, 250, 220, 470, 490, 770, 500, 1170, 580, 1380, 780}, 2.5f, 0, 1, new int[] {0x00FFFFFF, 0x99C8FFF0, 0x00FFFFFF});
-            } else {
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 700, 200, 640, 380, 380, 640, 330, 1080, 260, 1380, 60}, 120, 14, .75f, new int[] {0x00B6FF5C, 0xE6B6FF5C, 0xB33EF2D0, 0x003EF2D0});
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 720, 220, 660, 400, 420, 660, 360, 1100, 290, 1380, 100}, 6, 3, 1, new int[] {0x00FFFFFF, 0xD9E9FFF2, 0x007FF7FF});
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 760, 260, 700, 460, 470, 700, 410, 1120, 330, 1380, 160}, 70, 14, .8f, new int[] {0x002FB7FF, 0x994FD2FF, 0x002FB7FF});
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 770, 270, 715, 470, 490, 710, 430, 1130, 350, 1380, 180}, 2.5f, 3, .8f, new int[] {0x00FFFFFF, 0xD9E9FFF2, 0x007FF7FF});
-                ribbon(canvas, paint, sx, sy, sk, new float[] {-80, 640, 160, 600, 360, 330, 600, 280, 1040, 220, 1380, 10}, 2, 0, .55f, new int[] {0x00FFFFFF, 0xD9E9FFF2, 0x007FF7FF});
-            }
-            return bitmap;
-        }
-
-        /**
-         * One ribbon: M p0 C c1 c2 p1 S c3 p2, the S reflecting c2 about p1.
-         * Width and blur are in sketch pixels.
-         */
-        private static void ribbon(Canvas canvas, Paint paint, float sx, float sy, float sk, float[] p, float width, float blur, float alpha, int[] colors) {
-            Path path = new Path();
-            path.moveTo(p[0] * sx, p[1] * sy);
-            path.cubicTo(p[2] * sx, p[3] * sy, p[4] * sx, p[5] * sy, p[6] * sx, p[7] * sy);
-            float rx = 2 * p[6] - p[4], ry = 2 * p[7] - p[5];
-            path.cubicTo(rx * sx, ry * sy, p[8] * sx, p[9] * sy, p[10] * sx, p[11] * sy);
-            float[] stops = new float[colors.length];
-            for (int i = 0; i < colors.length; i++) stops[i] = colors.length == 1 ? 0 : i / (float) (colors.length - 1);
-            paint.setShader(new LinearGradient(0, 0, 1280 * sx, 0, colors, stops, CLAMP));
-            paint.setStrokeWidth(Math.max(1, width * sk));
-            paint.setMaskFilter(blur > 0 ? new BlurMaskFilter(Math.max(1, blur * sk * 2), BlurMaskFilter.Blur.NORMAL) : null);
-            paint.setAlpha(Math.round(255 * alpha));
-            canvas.drawPath(path, paint);
-            paint.setMaskFilter(null);
-            paint.setShader(null);
-            paint.setAlpha(255);
+            long now = SystemClock.uptimeMillis();
+            if (started < 0) started = now;
+            boolean moving = moving();
+            painter.draw(canvas, w, h, dark, (now - started) / 1000.0, moving);
+            if (moving) postInvalidateOnAnimation();
         }
     }
 
