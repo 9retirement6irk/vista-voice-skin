@@ -6,7 +6,7 @@ A [Kiosk Satellite](https://github.com/jxlarrea/kiosk-satellite) voice skin that
 
 ## What it draws
 
-**Full screen.** A glass window titled **Voice Assistant** sits over the wallpaper, with the black glass taskbar and a clock along the bottom. Inside, the microphone glows with your voice and the answer appears in blue, like a Vista task dialog's main instruction. What you said shows above it and the action the assistant took shows below it with a green check. The footer holds the progress bar:
+**Full screen.** A glass window titled **Voice Assistant** sits over the wallpaper, with the black glass taskbar and a clock along the bottom. The start orb at the left of the taskbar shows the Home Assistant icon from Kiosk Satellite's own icon set. Inside, the microphone glows with your voice and the answer appears in blue, like a Vista task dialog's main instruction. What you said shows above it and the action the assistant took shows below it with a green check. The footer holds the progress bar:
 
 | While | The bar | The microphone |
 | --- | --- | --- |
@@ -17,13 +17,17 @@ A [Kiosk Satellite](https://github.com/jxlarrea/kiosk-satellite) voice skin that
 
 **Docked.** A small glass window at the bottom of the screen with the microphone, the conversation and a thin progress bar. The dashboard stays in view and usable around it.
 
+**Wallpaper.** The same aurora as the Windows Vista Home Assistant theme: the green Aurora in light mode and the black Aurora in dark mode, scaled to cover the screen. They ship as `assets/wallpaper-light.jpg` and `assets/wallpaper-dark.jpg`; swap either file to use your own. Without them the skin paints its own aurora.
+
 **Dark theme.** Smoky black glass with a black glossy client area, in the style of Windows Media Player 11.
+
+**Light and dark follow Kiosk Satellite.** With **Theme** on Auto, the skin switches between Aero and the dark look whenever Kiosk Satellite does, even while it is on screen. Glass, text, progress bar and wallpaper all change together.
 
 ## Settings
 
 The skin follows **Voice Satellite > Appearance**:
 
-- **Theme**: Auto, Light or Dark.
+- **Theme**: Auto follows Kiosk Satellite's light or dark mode; Light or Dark forces one.
 - **Background**: the wallpaper's opacity. Skin default is fully opaque.
 - **Text size**: scales every line.
 - **Reactive activity bar**: while off, the bar and glow stay still.

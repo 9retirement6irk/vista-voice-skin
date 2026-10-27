@@ -14,6 +14,14 @@ public final class VistaSkinTest {
         final Map<String, OverlaySpec> overlays = new HashMap<>();
         final List<String> logs = new ArrayList<>();
         boolean older;
+        /** Package assets; null is a host without the asset API. */
+        Map<String, byte[]> assets;
+        public java.io.InputStream openAsset(String name) throws java.io.IOException {
+            if (assets == null) throw new UnsupportedOperationException("Plugin assets are unavailable");
+            byte[] data = assets.get(name);
+            if (data == null) throw new java.io.FileNotFoundException(name);
+            return new java.io.ByteArrayInputStream(data);
+        }
         public void executeCommand(String command, Map<String, Object> arguments, CommandCallback callback) {
             assert arguments.isEmpty();
             reads.put(command, callback);
@@ -131,6 +139,46 @@ public final class VistaSkinTest {
         assert skin.drawn() == null && "idle".equals(turn.state) && turn.answer.isEmpty() && "auto".equals(turn.theme);
         staleState.onResult(true, map("skinSelected", true, "overlay", "full"), null);
         assert host.overlays.isEmpty();
+
+        // Theme: Light and Dark force theirs, anything else follows KS's light or dark mode.
+        Turn follow = new Turn();
+        for (String pick : new String[] {"auto", "Auto", "system", "", null, "something new"}) {
+            follow.theme = pick;
+            assert follow.dark(true) && !follow.dark(false) : pick;
+        }
+        follow.theme = " Dark ";
+        assert follow.dark(false);
+        follow.theme = "LIGHT";
+        assert !follow.dark(true);
+
+        // The Home Assistant theme's wallpapers load from the assets; light and dark are kept apart.
+        assert turn.wallpaperLight == null && turn.wallpaperDark == null;
+        Host withAssets = new Host();
+        withAssets.assets = new HashMap<>();
+        withAssets.assets.put("wallpaper-light.jpg", new byte[] {1, 2, 3});
+        withAssets.assets.put("wallpaper-dark.jpg", new byte[] {4, 5});
+        VistaSkinPlugin themed = new VistaSkinPlugin();
+        themed.start(withAssets, map());
+        Turn walls = themed.skin().turn;
+        assert Arrays.equals(walls.wallpaper(false), new byte[] {1, 2, 3});
+        assert Arrays.equals(walls.wallpaper(true), new byte[] {4, 5});
+        assert walls.mic == null;
+
+        // The photo is decoded no smaller than the screen and cropped to cover it, like CSS cover.
+        assert Aero.Wallpaper.sampleSize(1920, 1200, 1920, 1200) == 1;
+        assert Aero.Wallpaper.sampleSize(1920, 1200, 960, 600) == 2;
+        assert Aero.Wallpaper.sampleSize(1920, 1200, 959, 400) == 2;
+        assert Aero.Wallpaper.sampleSize(1920, 1200, 400, 250) == 4;
+        assert Aero.Wallpaper.sampleSize(1920, 1200, 2560, 1600) == 1;
+        assert Aero.Wallpaper.sampleSize(1920, 1200, 0, 0) == 1;
+        // A 16:10 picture on a 16:9 screen loses a little top and bottom.
+        assert Arrays.equals(Aero.Wallpaper.coverCrop(1920, 1200, 1920, 1080), new int[] {0, 60, 1920, 1140});
+        // On a portrait phone it keeps the middle.
+        assert Arrays.equals(Aero.Wallpaper.coverCrop(1920, 1200, 1080, 1920), new int[] {622, 0, 1297, 1200});
+        assert Arrays.equals(Aero.Wallpaper.coverCrop(1920, 1200, 1920, 1200), new int[] {0, 0, 1920, 1200});
+
+        // The start orb shows KS's Home Assistant icon, and its plain house on a KS without it.
+        assert "mdi:home-assistant".equals(Aero.Taskbar.ORB_ICONS[0]) && "mdi:home".equals(Aero.Taskbar.ORB_ICONS[1]);
 
         // Older Kiosk Satellite: no voice skin events, nothing happens.
         Host older = new Host();

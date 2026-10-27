@@ -204,8 +204,15 @@ final class SkinController {
             return skin.asView();
         }
 
+        /**
+         * KS switched between light and dark, or changed its colors. In Auto
+         * the skin follows it: glass, client area, text, meter and wallpaper
+         * all swap. KS may hand back the view it wraps ours in, so fall back
+         * to the one this factory built.
+         */
         @Override public void onThemeChanged(View changed, KsTheme theme) {
-            ((SkinView) changed).restyle(theme);
+            SkinView target = changed instanceof SkinView ? (SkinView) changed : view;
+            if (target != null && theme != null) target.restyle(theme);
         }
 
         @Override public void onDestroy(View destroyed) {

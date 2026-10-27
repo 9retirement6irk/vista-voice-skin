@@ -38,6 +38,13 @@ final class Turn {
 
     /** The chrome microphone, or null when the asset could not load. */
     volatile Bitmap mic;
+    /**
+     * The Home Assistant theme's wallpapers, still compressed. The wallpaper
+     * view decodes the one it needs at its own size. Null draws the painted
+     * aurora instead.
+     */
+    volatile byte[] wallpaperLight;
+    volatile byte[] wallpaperDark;
 
     /** What the turn is doing, for the status line, the meter and the busy ring. */
     int phase() {
@@ -52,10 +59,20 @@ final class Turn {
         return DONE;
     }
 
-    /** Theme picks the palette: Auto follows KS, Light and Dark force theirs. */
+    /**
+     * Theme picks the palette: Light and Dark force theirs, anything else
+     * (Auto, System, unset) follows Kiosk Satellite's own light or dark mode.
+     */
     boolean dark(boolean ksDark) {
-        String pick = theme;
-        return "dark".equals(pick) || (!"light".equals(pick) && ksDark);
+        String pick = theme == null ? "" : theme.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("dark".equals(pick)) return true;
+        if ("light".equals(pick)) return false;
+        return ksDark;
+    }
+
+    /** The compressed wallpaper for a mode, or null. */
+    byte[] wallpaper(boolean dark) {
+        return dark ? wallpaperDark : wallpaperLight;
     }
 
     /** The main instruction line: the answer, else a placeholder for the phase. */

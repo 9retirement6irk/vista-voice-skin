@@ -546,17 +546,23 @@ final class Aero {
     // ---------------------------------------------------------------- Wallpaper
 
     /**
-     * An aurora: soft green and cyan ribbons of light over deep teal. It is
-     * painted once into a half size bitmap whenever the size or theme
-     * changes, so the blur costs nothing per frame.
+     * The wallpaper. It shows the same aurora photo as the Windows Vista
+     * Home Assistant theme: the green Aurora in light mode and the black
+     * one in dark mode, scaled to cover the screen. Without those assets it
+     * paints its own aurora: soft green and cyan ribbons over deep teal.
+     * Either way it is prepared once whenever the size or theme changes,
+     * so it costs nothing per frame.
      */
     static final class Wallpaper extends View {
         private final Turn turn;
         private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
         private final Rect dst = new Rect();
+        private final Rect src = new Rect();
         private Bitmap painted;
         private boolean dark;
         private boolean paintedDark;
+        /** True when painted is the theme photo, which is cropped rather than stretched. */
+        private boolean photo;
 
         Wallpaper(Context context, Turn turn) {
             super(context);
@@ -581,8 +587,11 @@ final class Aero {
             int w = getWidth(), h = getHeight();
             if (w <= 0 || h <= 0) return;
             if (painted == null || paintedDark != dark) {
+                painted = null;
                 try {
-                    painted = paint(Math.max(1, w / 2), Math.max(1, h / 2), dark);
+                    painted = decode(turn.wallpaper(dark), w, h);
+                    photo = painted != null;
+                    if (painted == null) painted = paint(Math.max(1, w / 2), Math.max(1, h / 2), dark);
                     paintedDark = dark;
                 } catch (OutOfMemoryError tight) {
                     painted = null;
@@ -593,7 +602,53 @@ final class Aero {
             Float background = turn.background;
             paint.setAlpha(Math.round(255 * (background != null ? background : 1f)));
             dst.set(0, 0, w, h);
-            canvas.drawBitmap(painted, null, dst, paint);
+            canvas.drawBitmap(painted, photo ? cover(painted.getWidth(), painted.getHeight(), w, h, src) : null, dst, paint);
+        }
+
+        /**
+         * Decodes the theme photo no smaller than the view needs, halving it
+         * while it stays at least that big, so a phone never holds a full
+         * size picture. Null when there is no photo or it will not decode.
+         */
+        static Bitmap decode(byte[] jpeg, int w, int h) {
+            if (jpeg == null || jpeg.length == 0) return null;
+            android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+            options.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, w, h);
+            return android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, options);
+        }
+
+        /** The largest power of two that keeps the picture at least as big as the view, to cover it. */
+        static int sampleSize(int imageW, int imageH, int viewW, int viewH) {
+            if (imageW <= 0 || imageH <= 0 || viewW <= 0 || viewH <= 0) return 1;
+            // Covering the view needs the picture at this fraction of its size.
+            float scale = Math.max(viewW / (float) imageW, viewH / (float) imageH);
+            int sample = 1;
+            while (sample < 64 && 1f / (sample * 2) >= scale) sample *= 2;
+            return sample;
+        }
+
+        /** The centered part of the picture that fills the view without stretching, like CSS cover. */
+        static Rect cover(int imageW, int imageH, int viewW, int viewH, Rect out) {
+            int[] crop = coverCrop(imageW, imageH, viewW, viewH);
+            out.set(crop[0], crop[1], crop[2], crop[3]);
+            return out;
+        }
+
+        /** left, top, right, bottom of the cover crop. */
+        static int[] coverCrop(int imageW, int imageH, int viewW, int viewH) {
+            float imageRatio = imageW / (float) imageH, viewRatio = viewW / (float) Math.max(1, viewH);
+            if (imageRatio > viewRatio) {
+                int cropW = Math.max(1, Math.min(imageW, Math.round(imageH * viewRatio)));
+                int left = (imageW - cropW) / 2;
+                return new int[] {left, 0, left + cropW, imageH};
+            }
+            int cropH = Math.max(1, Math.min(imageH, Math.round(imageW / viewRatio)));
+            int top = (imageH - cropH) / 2;
+            return new int[] {0, top, imageW, top + cropH};
         }
 
         static Bitmap paint(int w, int h, boolean dark) {
@@ -682,9 +737,50 @@ final class Aero {
         static int rise(KsTheme theme) { return theme.px(6); }
 
         void restyle(KsTheme theme) {
+            if (this.theme != theme) { orbIcon = null; orbIconLooked = false; }
             this.theme = theme;
             text.setTypeface(theme.typeface(400));
             invalidate();
+        }
+
+        /** The Home Assistant icon from KS's own icon set, or its plain house on a KS without it. */
+        static final String[] ORB_ICONS = {"mdi:home-assistant", "mdi:home"};
+        private Path orbIcon;
+        private boolean orbIconLooked;
+        private final Path orbScaled = new Path();
+        private final Matrix orbMatrix = new Matrix();
+
+        private Path orbIcon() {
+            if (orbIconLooked || theme == null) return orbIcon;
+            for (String name : ORB_ICONS) {
+                try {
+                    orbIcon = theme.iconPath(name);
+                } catch (RuntimeException | LinkageError olderHost) {
+                    orbIcon = null;
+                }
+                if (orbIcon != null) break;
+            }
+            orbIconLooked = true;
+            return orbIcon;
+        }
+
+        /** White with a soft dark edge below it, like the flag on the Vista orb. */
+        private void drawOrbIcon(Canvas canvas, float cx, float cy, float orb) {
+            Path icon = orbIcon();
+            if (icon == null) return;
+            float size = orb * .58f;
+            orbMatrix.setScale(size / 24f, size / 24f);
+            orbMatrix.postTranslate(cx - size / 2, cy - size / 2);
+            icon.transform(orbMatrix, orbScaled);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0x73001A40);
+            int save = canvas.save();
+            canvas.translate(0, Math.max(1, theme.px(1)));
+            canvas.drawPath(orbScaled, paint);
+            canvas.restoreToCount(save);
+            paint.setShader(new LinearGradient(0, cy - size / 2, 0, cy + size / 2, 0xFFFFFFFF, 0xFFD6ECFF, CLAMP));
+            canvas.drawPath(orbScaled, paint);
+            paint.setShader(null);
         }
 
         @Override protected void onDetachedFromWindow() {
@@ -710,6 +806,9 @@ final class Aero {
             canvas.drawCircle(ocx, ocy, orb * .75f, paint);
             paint.setShader(new RadialGradient(ocx, oy + orb * .92f, orb, new int[] {0xFF6FF0FF, 0xFF1584D8, 0xFF0A3F85, 0xFF021530}, new float[] {0, .38f, .7f, 1}, CLAMP));
             canvas.drawCircle(ocx, ocy, orb / 2, paint);
+            paint.setShader(null);
+            drawOrbIcon(canvas, ocx, ocy, orb);
+            // The glass highlight goes over the icon, so it sits inside the orb.
             paint.setShader(new LinearGradient(0, oy + orb * .05f, 0, oy + orb * .48f, 0xD9FFFFFF, 0x1AFFFFFF, CLAMP));
             box.set(ocx - orb * .33f, oy + orb * .05f, ocx + orb * .33f, oy + orb * .48f);
             canvas.drawOval(box, paint);
